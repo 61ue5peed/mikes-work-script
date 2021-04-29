@@ -1,0 +1,22 @@
+{
+  "name": "script",
+  "version": "1.0.0",
+  "description": "csv read, 2x api calls csv write",
+  "main": "script.js",
+  "scripts": {
+    "test": "test"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^0.21.1",
+    "bluebird": "^3.7.2",
+    "csv": "^5.5.0",
+    "csv-parser": "^3.0.0",
+    "decompress-response": "^7.0.0",
+    "node-fetch": "^2.6.1",
+    "pako": "^2.0.3",
+    "papaparse": "^5.3.0",
+    "zlib": "^1.0.5"
+  }
+}
