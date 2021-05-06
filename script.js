@@ -5,7 +5,7 @@ const axios = require("axios").default;
 
 async function openCSV() {
   let file = [];
-  file = await fs.readFile("data.csv", "utf8");
+  file = await fs.readFile("dataAgain.csv", "utf8");
 
   var dataArray = file.split(/\r?\n/);
 
@@ -34,12 +34,15 @@ async function hitApis(rows) {
     "hoven",
     "Vinkwijkse",
   ];
-  // let objectIndexToGet = 0;
 
   for (let i = 0; i < rows.length; i++) {
     let currentRow = rows[i];
 
     let currentPostCode = currentRow.POSTCODE;
+    if (currentPostCode === undefined) {
+      currentRow.Object = "Skipped checking because PostCode undefined";
+      continue;
+    }
     currentPostCode = currentPostCode.replace(" ", "");
     let currentHouseNumber = currentRow.Huisnummer;
     let currentHouseLetter = currentRow.HuisnummerExtra ? currentRow.HuisnummerExtra : null;
@@ -81,8 +84,14 @@ async function hitApis(rows) {
       console.log("Skipped checking because Multiple House Letters");
     } else {
       const objectCode = await callFistAPI(currentPostCode, houseNumber, currentHouseLetter);
-
+      console.log(objectCode);
       if (objectCode.code !== null) {
+        // if (objectCode.error === null) {
+        //   currentRow.Object = objectCode.code;
+        // } else {
+        currentRow.Object = `${objectCode.code}, ${objectCode.error}`;
+        // }
+
         const secondAPIResponse = await hitSecondAPI(objectCode);
 
         if (secondAPIResponse === undefined) {
@@ -161,18 +170,26 @@ async function callFistAPI(postCode, houseNumber, houseLetter) {
     }
     const rawLabel = firstResult[0]._links.adresseerbaarObject?.label;
     objectCode = rawLabel.split(" ")[1];
+    if (objectCode === "" || null) {
+      return { error: `ObjectCode had an issue: ${rawLabel}`, code: null };
+    }
     console.log(`ObjectCode: ${objectCode}`);
     return { error: null, code: objectCode };
   } else {
     let mostRecent = null;
     let mostRecentObjectCode = null;
-    firstResult.forEach((object) => {
-      if (firstResult[0]._links.adresseerbaarObject === null) {
+    let multipleActive = null;
+    await firstResult.forEach((object) => {
+      if (object._links.adresseerbaarObject === null) {
         return { error: "adresseerbaarObject is null on latest object", code: null };
       }
-      const rawLabel = firstResult[0]._links.adresseerbaarObject?.label;
+      const rawLabel = object._links.adresseerbaarObject?.label;
       objectCode = rawLabel.split(" ")[1];
       let date = Date.parse(object._embedded.geldigVoorkomen.beginGeldigheid);
+
+      if (object.status === "Naamgeving uitgegeven") {
+        multipleActive += 1;
+      }
 
       if (mostRecentObjectCode === null || mostRecent === null) {
         mostRecentObjectCode = objectCode;
@@ -181,10 +198,14 @@ async function callFistAPI(postCode, houseNumber, houseLetter) {
       if (mostRecent !== null && mostRecent < date) {
         mostRecent = date;
         mostRecentObjectCode = objectCode;
-      } else if (mostRecent === date && object._embedded.status === "Naamgeving uitgegeven") {
+      } else if (mostRecent === date && object.status === "Naamgeving uitgegeven") {
         mostRecentObjectCode = objectCode;
       }
     });
+    if (multipleActive > 1) {
+      console.log("MORE THAN ONE ACTIVE");
+      return { error: `Number of Active objects: ${multipleActive}`, code: mostRecentObjectCode };
+    }
     return { error: null, code: mostRecentObjectCode };
   }
 }
